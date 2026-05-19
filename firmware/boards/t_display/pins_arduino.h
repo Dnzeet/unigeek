@@ -34,8 +34,8 @@ static const uint8_t SCL = GROVE_SCL;
 #define BAT_ADC_PIN  34
 
 // ─── Buttons ──────────────────────────────────────────────
-#define BTN_UP  0    // top button
-#define BTN_B   35   // bottom button
+#define BTN_UP  35    // top button
+#define BTN_B   0   // bottom button
 
 // ─── IR Transmitter ──────────────────────────────────────
 #define IR_TX_PIN  2
@@ -55,7 +55,7 @@ static const uint8_t SCL = GROVE_SCL;
 #define TFT_RST     23
 #define TFT_BL      -1
 #define TFT_BACKLIGHT_ON HIGH
-#define TFT_DEFAULT_ORIENTATION 3
+#define TFT_DEFAULT_ORIENTATION 1
 #define TOUCH_CS    -1
 #define SMOOTH_FONT
 #define SPI_FREQUENCY       40000000
