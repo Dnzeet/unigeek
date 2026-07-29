@@ -11,7 +11,7 @@ Evil Twin creates a fake WiFi access point with the same name as a real network,
 2. **Network** — Scan and select the target WiFi network to clone
 3. **Deauth** (optional) — Toggle on to send deauth frames to the real AP, forcing clients to disconnect and reconnect to your fake AP
 4. **Check Password** (optional) — Toggle on to verify captured passwords against the real network in real-time; the victim sees a "Connecting..." page while verification runs, then "Connected!" or "Incorrect password"
-5. **Portal** — Select a portal template from storage (HTML login pages stored in `/unigeek/web/portals/`); download sample portals via **WiFi > Network > Download > Firmware Sample Files** if none exist
+5. **Portal** — Select a portal template from storage (HTML login pages stored in `/unigeek/web/portals/`); download sample portals via **WiFi > Network > Internet > Download > Firmware Sample Files** if none exist
 6. **Start** — Launches the attack
 
 ## During Attack

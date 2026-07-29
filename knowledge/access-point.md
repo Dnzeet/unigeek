@@ -57,7 +57,7 @@ POST form submissions from the portal are saved to `/unigeek/wifi/captives/{doma
 
 When enabled, visiting `unigeek.local` (or the AP IP on port 8080) opens a browser-based file manager for the device's storage. Useful for retrieving captured credentials, uploading portal templates, or managing files without USB.
 
-Requires web files to be installed on storage first — download them via **WiFi > Network > Download > Firmware Sample Files**.
+Requires web files to be installed on storage first — download them via **WiFi > Network > Internet > Download > Firmware Sample Files**.
 
 ## Files
 
