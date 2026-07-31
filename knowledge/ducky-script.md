@@ -390,7 +390,7 @@ END_WHILE
 
 ## Sample Scripts
 
-Ready-made samples are available via **WiFi > Network > Download > Firmware Sample Files**:
+Ready-made samples are available via **WiFi > Network > Internet > Download > Firmware Sample Files**:
 
 - `hello_world.txt` — Opens Notepad and types a message
 - `rick_roll.txt` — Opens a browser to Rick Astley

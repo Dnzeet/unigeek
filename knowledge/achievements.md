@@ -312,4 +312,4 @@ If no title has been set, it shows `[RANK] No Title` by default.
 | Blank Re-writer | Chameleon | Gold | 600 |
 | Lockpick LF | Chameleon | Gold | 600 |
 
-> WiGLE uploads from both GPS > Wardriving and WiFi > Network > WiGLE count toward the same milestones. Locked Platinum entries display `???` in the in-app list until earned.
+> WiGLE uploads from both GPS > Wardriving and WiFi > Network > Internet > Wigle count toward the same milestones. Locked Platinum entries display `???` in the in-app list until earned.

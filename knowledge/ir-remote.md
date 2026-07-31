@@ -68,7 +68,7 @@ data: 9024 4512 564 564 564 1692 564 ...
 Download IR remote files over WiFi directly to the device:
 
 1. Connect to a WiFi network (**WiFi > Connect**)
-2. Go to **WiFi > Network > Download > Infrared Files**
+2. Go to **WiFi > Network > Internet > Download > Infrared Files**
 3. Browse categories (TVs, ACs, Fans, Projectors, Sound Bars, etc. — 46 categories)
 4. Select a category to download all remote files in it
 5. Files are saved to `/unigeek/ir/downloads/{category}/`

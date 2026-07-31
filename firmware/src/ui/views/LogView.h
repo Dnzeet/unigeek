@@ -49,20 +49,27 @@ public:
     int startIdx   = autoStart - _scrollY;
     if (startIdx < 0) startIdx = 0;
 
-    // Draw each visible log line in a per-row sprite to avoid fill→text flicker.
+    // One sprite reused for every row, not one per row. At 240 px wide each is
+    // a ~4.8 KB allocation, and creating and freeing a dozen of them on every
+    // redraw churns the heap hard enough to matter: on a board without PSRAM
+    // the WiFi driver takes its TX buffers from the same heap, and a MITM run
+    // serving a portal page was bottoming out at 1 KB free. Same pixels, same
+    // flicker-free fill→push per row, one allocation instead of a dozen.
     int rendered = 0;
-    for (int i = startIdx; i < _count && rendered < maxVisible; i++) {
-      int rowY = y + (i - startIdx) * lineH;
+    if (maxVisible > 0 && startIdx < _count) {
       Sprite sp(&lcd);
       sp.createSprite(w, lineH);
-      sp.fillSprite(TFT_BLACK);
       sp.setTextSize(1);
       sp.setTextDatum(TL_DATUM);
-      sp.setTextColor(_colors[i], TFT_BLACK);
-      sp.drawString(_lines[i], 2, 0);
-      sp.pushSprite(x, rowY);
+      for (int i = startIdx; i < _count && rendered < maxVisible; i++) {
+        int rowY = y + (i - startIdx) * lineH;
+        sp.fillSprite(TFT_BLACK);
+        sp.setTextColor(_colors[i], TFT_BLACK);
+        sp.drawString(_lines[i], 2, 0);
+        sp.pushSprite(x, rowY);
+        rendered++;
+      }
       sp.deleteSprite();
-      rendered++;
     }
 
     // Clear any unused rows below the last log line.

@@ -6,22 +6,11 @@
 #include "core/ScreenManager.h"
 #include "core/AchievementManager.h"
 #include "screens/wifi/WifiMenuScreen.h"
-#include "screens/wifi/network/WorldClockScreen.h"
-#include "screens/wifi/network/WikipediaScreen.h"
-#include "screens/wifi/network/IPScannerScreen.h"
-#include "screens/wifi/network/PortScannerScreen.h"
-#include "screens/wifi/network/WebFileManagerScreen.h"
-#include "screens/wifi/network/DownloadScreen.h"
-#include "screens/wifi/network/NetworkMitmScreen.h"
-#include "screens/wifi/network/CctvSnifferScreen.h"
-#include "screens/wifi/network/WigleScreen.h"
-#include "screens/wifi/network/CastBombScreen.h"
-#include "screens/wifi/network/BonjourSpamScreen.h"
-#include "screens/wifi/network/PrinterPrankScreen.h"
-#ifdef HAS_NET_TOOLS
-#include "screens/wifi/network/ResponderScreen.h"
-#include "screens/wifi/network/Socks4ProxyScreen.h"
-#endif
+#include "screens/wifi/network/NetworkScannersScreen.h"
+#include "screens/wifi/network/NetworkAttacksScreen.h"
+#include "screens/wifi/network/NetworkPranksScreen.h"
+#include "screens/wifi/network/NetworkServicesScreen.h"
+#include "screens/wifi/network/NetworkInternetScreen.h"
 #include "ui/actions/ShowStatusAction.h"
 #include "ui/actions/ShowQRCodeAction.h"
 #include <WiFi.h>
@@ -67,22 +56,11 @@ void NetworkMenuScreen::onItemSelected(uint8_t index) {
     switch (index) {
       case 0: _showInformation(); break;
       case 1: _showWifiQR(); break;
-      case 2: Screen.push(new WorldClockScreen()); break;
-      case 3: Screen.push(new WikipediaScreen()); break;
-      case 4: Screen.push(new IPScannerScreen());  break;
-      case 5: Screen.push(new PortScannerScreen()); break;
-      case 6: Screen.push(new WebFileManagerScreen()); break;
-      case 7: Screen.push(new DownloadScreen()); break;
-      case 8: Screen.push(new NetworkMitmScreen()); break;
-      case 9: Screen.push(new CctvSnifferScreen()); break;
-      case 10: Screen.push(new WigleScreen()); break;
-      case 11: Screen.push(new CastBombScreen()); break;
-      case 12: Screen.push(new BonjourSpamScreen()); break;
-      case 13: Screen.push(new PrinterPrankScreen()); break;
-#ifdef HAS_NET_TOOLS
-      case 14: Screen.push(new ResponderScreen()); break;
-      case 15: Screen.push(new Socks4ProxyScreen()); break;
-#endif
+      case 2: Screen.push(new NetworkScannersScreen()); break;
+      case 3: Screen.push(new NetworkAttacksScreen());  break;
+      case 4: Screen.push(new NetworkPranksScreen());   break;
+      case 5: Screen.push(new NetworkServicesScreen()); break;
+      case 6: Screen.push(new NetworkInternetScreen()); break;
     }
   } else if (_state == STATE_INFORMATION) {
     _showMenu();

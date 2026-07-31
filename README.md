@@ -40,7 +40,7 @@ firmware menu, so it never drifts:
 - 🪪 **NFC** — MIFARE Classic key recovery (dictionary, nested, darkside), PN532 / PN532Killer, Chameleon Ultra BLE client
 - 📺 **IR** — capture, replay, TV-B-Gone, Flipper-IRDB compatible
 - ⌨️ **HID** — USB & BLE keyboard, DuckyScript 3.0, mouse jiggle, WebAuthn/FIDO2 passkey, USB mass storage
-- 🌐 **Network** — MITM, Responder (NetNTLMv2 capture), SOCKS4 proxy, CCTV sniffer, cast bomb, printer prank, mDNS spam, web/BLE file manager, Wikipedia browser
+- 🌐 **Network** — grouped into submenus: **Scanners** (IP, port, CCTV), **Attacks** (MITM with ARP poisoning + PCAP capture, DHCP attack, Responder), **Pranks** (cast bomb, mDNS spam, printer prank), **Services** (web file manager, SOCKS4 proxy), **Internet** (world clock, Wikipedia, Wigle, downloader)
 - 🧰 **Utility & Games** — QR/barcode, TOTP, UART terminal, password manager, Lua runner, achievements, and several on-device games
 
 > Each item links to step-by-step docs on the [features site](https://unigeek.xid.run/features/).
