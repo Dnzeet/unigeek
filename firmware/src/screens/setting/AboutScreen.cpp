@@ -1,10 +1,7 @@
 #include "screens/setting/AboutScreen.h"
 #include "screens/setting/SettingScreen.h"
 #include "core/ScreenManager.h"
-
-#ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "dev"
-#endif
+#include "utils/FirmwareInfo.h"
 
 void AboutScreen::onInit()
 {
@@ -13,6 +10,7 @@ void AboutScreen::onInit()
   _rows[i++] = { "--- About ---", "" };
   _rows[i++] = { "Firmware",  "UniGeek" };
   _rows[i++] = { "Version",   FIRMWARE_VERSION };
+  _rows[i++] = { "Board",     FIRMWARE_BOARD };
   _rows[i++] = { "Author",    "L Shaf" };
   _rows[i++] = { "Platform",  "ESP32 Arduino" };
   _rows[i++] = { "Framework", "PlatformIO" };

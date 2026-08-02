@@ -6,6 +6,7 @@
 #include "utils/network/WebFileManager.h"
 #include "ui/actions/ShowStatusAction.h"
 #include "ui/views/ProgressView.h"
+#include "ui/views/BrowseFileView.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
@@ -297,6 +298,7 @@ void DownloadScreen::_downloadSampleData() {
     }
   }
 
+  ProgressView::finish();
   if (downloaded > 0) {
     int nd = Achievement.inc("wifi_download_first");
     if (nd == 1)  Achievement.unlock("wifi_download_first");
@@ -365,6 +367,7 @@ void DownloadScreen::_showIRCategories() {
     return;
   }
 
+  ProgressView::finish();
   _state = STATE_IR_CATEGORIES;
   strcpy(_titleBuf, "Infrared Files");
   setItems(_catItems, _catCount);
@@ -454,6 +457,7 @@ void DownloadScreen::_downloadIRCategory(uint8_t index) {
     }
   }
 
+  ProgressView::finish();
   if (downloaded > 0) {
     int nir = Achievement.inc("wifi_download_ir");
     if (nir == 1) Achievement.unlock("wifi_download_ir");
@@ -538,6 +542,7 @@ void DownloadScreen::_showBadUSBOS() {
     _badusbAllFolders[_badusbAllCount++] = line;
   }
 
+  ProgressView::finish();
   _showBadUSBOSFromCache();
 }
 
@@ -687,6 +692,7 @@ void DownloadScreen::_downloadBadUSBCategory(uint8_t index) {
     }
   }
 
+  ProgressView::finish();
   if (downloaded > 0) {
     int n = Achievement.inc("wifi_download_badusb");
     if (n == 1) Achievement.unlock("wifi_download_badusb");
@@ -805,8 +811,8 @@ bool DownloadScreen::_populateLuaLevel(const String& path) {
     if (rest.length() == 0) continue;
 
     _luaIsFolder[_luaCount] = false;
-    _luaNames[_luaCount]    = rest;
-    _luaLabels[_luaCount]   = rest;
+    _luaNames[_luaCount]    = rest;                              // raw name → download path
+    _luaLabels[_luaCount]   = BrowseFileView::prettifyTitle(rest); // display title only
     _luaItems[_luaCount]    = {_luaLabels[_luaCount].c_str()};
     _luaCount++;
   }

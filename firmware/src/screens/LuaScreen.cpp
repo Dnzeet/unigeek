@@ -8,7 +8,10 @@
 
 void LuaScreen::_loadDir(const String& path) {
   _currentDir = path;
-  _browser.load(this, path, ".lua");
+  // _browser.root confines the picker to ROOT_DIR — ".." appears below but
+  // never resolves above /unigeek/lua.
+  _browser.root = ROOT_DIR;
+  _browser.load(this, path, ".lua", nullptr, BrowseFileView::TITLE);
   setItems(_browser.items(), _browser.count());
 }
 
@@ -61,13 +64,13 @@ void LuaScreen::onRender() {
 
 void LuaScreen::onBack() {
   if (_state != STATE_BROWSE) return;
-  if (_currentDir == ROOT_DIR) {
+  // Clamp at ROOT_DIR — never climb above /unigeek/lua.
+  if (_currentDir == ROOT_DIR || _currentDir.length() == 0) {
     Screen.goBack();
     return;
   }
   int slash = _currentDir.lastIndexOf('/');
   String parent = (slash > 0) ? _currentDir.substring(0, slash) : ROOT_DIR;
-  if (parent.length() == 0) parent = ROOT_DIR;
   _loadDir(parent);
 }
 
@@ -108,10 +111,11 @@ void LuaScreen::_startScript(const String& path) {
     return;
   }
 
-  static constexpr size_t kPsramThreshold = 2048;
   uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
 #ifdef BOARD_HAS_PSRAM
-  if (size >= kPsramThreshold) caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+  // PSRAM boards load the script into PSRAM so it never competes with the
+  // scarce internal SRAM; falls back to internal below if PSRAM is exhausted.
+  caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 #endif
   char* buf = (char*)heap_caps_malloc(size + 1, caps);
 #ifdef BOARD_HAS_PSRAM
@@ -174,7 +178,9 @@ void LuaScreen::_startScript(const String& path) {
 
 void LuaScreen::_handleDone(bool isError) {
   _engine.deinit();
-#ifdef DEVICE_HAS_TOUCH_NAV
+  // Re-enable nav for any touch board: the runner suppresses it on touch-nav
+  // boards at start, and a script may have toggled it via uni.useTouch().
+#if defined(DEVICE_HAS_TOUCH) || defined(DEVICE_HAS_TOUCH_NAV)
   if (Uni.Nav) Uni.Nav->setSuppressKeys(false);
 #endif
   if (!isError) {

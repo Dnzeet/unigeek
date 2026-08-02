@@ -3,6 +3,7 @@
 //
 
 #include "Navigation.h"
+#include "LedRing.h"
 
 static RotaryEncoder* _encoderPtr = nullptr;
 
@@ -14,7 +15,10 @@ void NavigationImpl::begin() {
   pinMode(ENCODER_BTN, INPUT_PULLUP);
   pinMode(ENCODER_BK,  INPUT_PULLUP);
 
-  _encoder    = new RotaryEncoder(ENCODER_A, ENCODER_B, RotaryEncoder::LatchMode::FOUR3);
+  // TWO03 (2 latch points per cycle) is more tolerant of a dropped quadrature
+  // edge than FOUR3 (single latch on state 3): a bounced final edge delays the
+  // step by half a detent instead of losing the whole click.
+  _encoder    = new RotaryEncoder(ENCODER_A, ENCODER_B, RotaryEncoder::LatchMode::TWO03);
   _encoderPtr = _encoder;
 
   attachInterrupt(digitalPinToInterrupt(ENCODER_A), checkPosition, CHANGE);
@@ -49,12 +53,14 @@ void NavigationImpl::update() {
     updateState(DIR_BACK);
   } else if (_selStable) {
     updateState(DIR_PRESS);
-  } else if (_posDiff <= -SCROLL_THRESH) {
+  } else if (_posDiff <= -DETENT_COUNTS) {
     updateState(DIR_DOWN);
-    _posDiff = 0;
-  } else if (_posDiff >= SCROLL_THRESH) {
+    LedRing::addEncoderDelta(-1);
+    _posDiff += DETENT_COUNTS;   // carry remainder, don't discard
+  } else if (_posDiff >= DETENT_COUNTS) {
     updateState(DIR_UP);
-    _posDiff = 0;
+    LedRing::addEncoderDelta(+1);
+    _posDiff -= DETENT_COUNTS;   // carry remainder, don't discard
   } else {
     updateState(DIR_NONE);
   }

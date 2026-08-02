@@ -38,20 +38,20 @@ private:
   uint8_t     _scannedCount = 0;
   ListItem    _scannedItems[WifiUtility::MAX_WIFI];
 
-  ListItem _menuItems[13] = {
+  // Tools live in category submenus (see Network*Screen). Only the two entries
+  // that describe *this connection* stay at the top level — burying them would
+  // cost a press every time you just want to check the IP.
+  //
+  // The HAS_NET_TOOLS gate now lives inside Attacks and Services, which is why
+  // this array no longer needs a conditional size or shifted switch indices.
+  ListItem _menuItems[7] = {
     {"Information"},
     {"WiFi QRCode"},
-    {"World Clock"},
-    {"IP Scanner"},
-    {"Port Scanner"},
-    {"Web File Manager"},
-    {"Download"},
-    {"MITM Attack"},
-    {"CCTV Sniffer"},
-    {"Wigle"},
-    {"Cast Bomb"},
-    {"Bonjour Spam"},
-    {"Printer Prank"},
+    {"Scanners"},
+    {"Attacks"},
+    {"Pranks"},
+    {"Services"},
+    {"Internet"},
   };
 
   void   _showMenu();

@@ -1,6 +1,6 @@
 # CCTV Sniffer
 
-Discovers network cameras, identifies their brand, tests login credentials, and streams live video. Accessed from **WiFi > Network > CCTV Sniffer**. Must be connected to a WiFi network first.
+Discovers network cameras, identifies their brand, tests login credentials, and streams live video. Accessed from **WiFi > Network > Scanners > CCTV Sniffer**. Must be connected to a WiFi network first.
 
 ## Scan Modes
 

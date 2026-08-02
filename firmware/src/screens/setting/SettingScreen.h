@@ -35,6 +35,10 @@ private:
     SETT_SPEAKER_TEST,
 #endif
     SETT_COLOR,
+    SETT_MASCOT,
+#ifdef DEVICE_HAS_LED_RING
+    SETT_LED_MODE,
+#endif
 #ifdef DEVICE_HAS_NAV_MODE_SWITCH
     SETT_NAV_MODE,
 #endif
@@ -50,6 +54,7 @@ private:
 #endif
     SETT_WEB_PASSWORD,
     SETT_PIN_SETTING,
+    SETT_HIDE_MODULE,
     SETT_DEVICE_STATUS,
     SETT_ABOUT,
     SETT_COUNT
@@ -70,6 +75,10 @@ private:
   String _navSndSub;
 #endif
   String _colorSub;
+  String _mascotSub;
+#ifdef DEVICE_HAS_LED_RING
+  String _ledModeSub;
+#endif
 #ifdef DEVICE_HAS_NAV_MODE_SWITCH
   String _navModeSub;
 #endif
@@ -98,6 +107,10 @@ private:
     {"Speaker Test"},
 #endif
     {"Primary Color",    ""},
+    {"Mascot",           ""},
+#ifdef DEVICE_HAS_LED_RING
+    {"LED Effect",       ""},
+#endif
 #ifdef DEVICE_HAS_NAV_MODE_SWITCH
     {"Navigation Mode",  ""},
 #endif
@@ -113,6 +126,7 @@ private:
 #endif
     {"Web Password",     ""},
     {"Pin Setting"},
+    {"Hide Module"},
     {"Device Status"},
     {"About"},
   };

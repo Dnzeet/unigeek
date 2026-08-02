@@ -38,25 +38,21 @@ This prevents entering the Sub-GHz menu with missing or misconfigured hardware.
 
 ## Detect Freq
 
-Scan all known Sub-GHz frequencies to find active signals before manually selecting a frequency.
+Find the strongest active carrier near you and read its exact frequency before manually selecting one. This is a **peak detector**, not a per-channel bar chart — it locks one signal and shows it big.
 
-1. Select **Detect Freq** from the menu
-2. The screen shows a **spectrum bar chart** — one bar per known frequency, bar height = RSSI signal strength
-   - **Dark grey** — no signal (below noise floor)
-   - **Dim green** — low-level activity
-   - **Bright green** — signal above threshold (> -65 dBm)
-   - **Yellow** — strongest channel found
-   - **White cursor line** — current frequency being probed
-3. Top left shows the current probe frequency; top right shows its live RSSI in dBm
-4. When a signal is detected, the second line shows the best frequency found and its RSSI: `> 433.920 MHz -55dBm`
-5. Scanning runs continuously through all ~40 known frequencies and loops — the display updates every sweep
-6. Press **BACK** (or **PRESS** on devices without a back button) to stop and return to the menu
+1. Select **Detect Freq** from the menu.
+2. The screen shows a single large **peak frequency readout** ("peaky" style) with a status line and an RSSI bar:
+   - **Searching** (dim grey) — sweeping, no carrier above the trigger yet
+   - **LIVE  −xx dBm** — a live carrier is locked; the frequency colour reflects strength: **green** ≥ −52 dBm (close), **yellow** ≥ −60 dBm (medium), **red** < −60 dBm (far)
+   - **hold  −xx dBm** (orange) — the signal dropped; the last peak is **sample-held** on screen for a few frames so it doesn't vanish the instant you release the remote
+3. Detection runs in two stages: a **coarse sweep** across the whole band fills the RSSI map and finds the strongest channel, then a **fine refine** (±0.3 MHz in 20 kHz steps) pins the exact carrier. The radio stays in RX continuously (no per-frame re-strobe that would reset the AGC).
+4. Press **BACK** (or **PRESS** on devices without a back button) to stop and return to the menu.
 
 **Detect Freq does not change the frequency setting.** Use the result as a reference, then manually set the frequency with the **Frequency** menu item.
 
 ### Known Frequencies Scanned
 
-The scanner probes ~40 frequencies covering all common Sub-GHz bands:
+The coarse sweep probes ~40 frequencies covering all common Sub-GHz bands before the fine refine pins the exact carrier:
 
 | Band | Frequencies |
 |------|-------------|
@@ -82,15 +78,93 @@ Capture RF signals on the configured frequency.
 
 1. Set the desired frequency first via **Detect Freq** (reference) and **Frequency** (set)
 2. Select **Receive**
-3. The device listens on the configured frequency
-4. Captured signals appear in the list with protocol details:
+3. The device listens on the configured frequency. The footer shows the current Receive Filter:
+   - **Filter: Code** (default) — drop raw captures; only emit signals that a decoder recognised — either a brand/manufacturer decoder (44 static protocols, see [Brand / Manufacturer Decoders](#brand--manufacturer-decoders)) or the RcSwitch table (Princeton, HT6P20B, CAME, NICE, KeeLoq, …). Cuts noise when hunting a fixed-code remote.
+   - **Filter: RAW** — capture both RCSwitch-decoded protocols **and** raw pulse streams that no protocol matched. Best for unknown remotes and unusual signals.
+4. Toggle between RAW / Code live without leaving the screen — the footer label updates immediately. Setting is session-only.
+   - **4-way devices** (Cardputer, Cardputer ADV, DIY Smoochie, DIY Marauder, sticks in Encoder mode): press **LEFT** or **RIGHT**.
+   - **2-way devices** (M5StickS3, T-Display, T-Lora Pager, T-Embed CC1101, CYD touch, CoreS3, sticks in default mode): **hold OK / PRESS for 500 ms**. The release after the hold is swallowed so it doesn't open a capture popup.
+5. Captured signals appear in the list with protocol details:
    - **RcSwitch**: `0xABCDEF P1 24b` (hex value, protocol number, bit count)
    - **RAW**: `RAW 120 pulses` (raw pulse count)
-5. Duplicate RcSwitch signals are automatically filtered
-6. Select a captured signal to **Replay**, **Save**, or **Delete** it
-7. Saved files go to `/unigeek/rf/` in `.sub` format
-8. Up to 15 signals can be captured per session
-9. Press **BACK** to stop receiving and return to the menu
+6. Duplicate RcSwitch signals are automatically filtered
+7. Select a captured signal to open the popup — **Info / Replay / Save / Delete**. **Info** opens a scrollable key:value detail view (frequency, preset, protocol, key, TE, bit length, RAW pulse count); BACK from Info returns to the popup.
+8. Saved files go to `/unigeek/rf/` in `.sub` format
+9. Up to 15 signals can be captured per session
+10. Press **BACK** to stop receiving and return to the menu
+
+## Record RAW
+
+Record the raw RF waveform **continuously** on the configured frequency until you stop it — modeled on Bruce's "Read RAW". Unlike **Receive** (which decodes and lists up to 15 *separate* signals, each capped at 512 transitions and gated on a protocol matching), **Record RAW** is **one protocol-agnostic capture** of everything on the channel into a large buffer (up to **8192 transitions**). Use it for unknown, rolling-code, or unusual signals you just want to capture and replay byte-exact.
+
+Record RAW uses the **frequency configured in the menu** (via **Frequency** / **Detect Freq**) — it does **not** scan. Set the frequency first.
+
+### Flow
+
+1. Select **Record RAW** from the menu.
+2. **Waiting for signal** — an animated **sine wave** plays while the recorder listens. It is armed but not yet capturing: it waits for a real carrier on the listened frequency. The carrier must stay above the **−65 dBm** threshold for ~8 ms before recording opens, so brief noise spikes/transients don't trigger it.
+3. **Recording** — on the first signal, the sine wave is replaced by a "Recording: *XXX* MHz" header and **RSSI bars** that march left-to-right (sampled every ~100 ms, wrapping at the right edge). Capture now runs **continuously** — it does *not* split into separate signals.
+4. **Gap compression** — when the carrier disappears for longer than ~25 ms, storing pauses so idle noise isn't recorded; the silence is re-inserted as a single compressed gap interval when the signal returns. The buffer holds signal content, not noise.
+5. **Stop** — press **OK / PRESS** to stop. Recording also auto-stops if the buffer fills (8192 transitions). Press **BACK** (or **ESC** on keyboard devices) to **abort and discard**.
+6. **Options** — after stopping, a menu opens showing the pulse count (`RAW NNN pulses`):
+   - **Replay** — retransmit the captured waveform byte-exact on the same frequency.
+   - **Save** — write a single `.sub` file (`Protocol: RAW`, `RAW_Data: …`) to `/unigeek/rf/`.
+   - **Record again** — discard and start a fresh capture.
+   - **Exit** — return to the Sub-GHz menu.
+
+> [!note]
+> Record RAW is a separate code path from **Receive** — it has its own continuous recorder (a dedicated GDO0 transition ISR + RSSI squelch) and does not affect how Receive captures or decodes signals.
+
+The saved file is identical in format to a RAW capture from **Receive** (see [File Format](#file-format)) and round-trips through **Send** and Flipper Zero / Bruce.
+
+## Brute Force
+
+Sweeps **every possible key** for a chosen fixed-code protocol on the configured frequency, transmitting each code in turn via the ESP32 **RMT** peripheral. Use it against fixed-code (non-rolling) gates and remotes where the full key space is small enough to exhaust.
+
+### Flow
+
+1. Set the frequency first (**Frequency** / **Detect Freq**).
+2. Select **Brute Force**, then pick a protocol from the picker.
+3. The device transmits sequentially through the key space and shows progress; press **BACK** to stop.
+
+### Protocols
+
+| Protocol | Bits | Key space |
+|----------|------|-----------|
+| CAME | 12 | 4096 |
+| NICE | 12 | 4096 |
+| FAAC | 12 | 4096 |
+| HT12E | 12 | 4096 |
+| Ansonic | 12 | 4096 |
+| Holtek | 12 | 4096 |
+| Linear | 10 | 1024 |
+| Chamberlain | 9 | 512 |
+| Princeton | 24 | 16.7 M (long sweep) |
+
+> [!warn]
+> Only sweep gates/remotes you own or are authorized to test. A full 24-bit Princeton sweep is very long; the 9–12 bit protocols finish in seconds to minutes.
+
+## Brand / Manufacturer Decoders
+
+On every completed capture, an **authoritative decode engine** runs the raw pulse train through brand/manufacturer state machines before falling back to the generic RcSwitch table and then RAW. The decode order is:
+
+1. **Brand decoders** — 44 brand/manufacturer protocols
+2. **RcSwitch table** — generic fixed-code protocols 1–23
+3. **RAW** — unrecognised pulse streams (kept only when the filter is `RAW`)
+
+Because the capture phase is unknown, each frame is tried at **both parities** and every decoder self-syncs on its own header. The decoded protocol name and fields appear in the capture list and the **Info** view; the raw pulses are retained so brand signals still replay and round-trip to `.sub`.
+
+### Supported protocols (44)
+
+CAME (+ TWEE), Princeton, Nice FLO (+ FloR-S), Holtek (+ HT12X), Linear (+ Delta3), Ansonic, BETT, Clemsa, Dickert, Doitrand, Dooya, Elplast, Feron, GateTX, Hormann, Intertechno V3, KeyFinder, Legrand, Marantec (24-bit), Mastercode, MegaCode, Nero Radio / Sketch, Roger, SMC5326, Treadmill37, GangQi, Hollarm, Honeywell (WDB / Sec), Cham_Code, Magellan, Power Smart, Revers_RB2, Airforce, Ditec GOL4, FAAC SLH, Phoenix V2, Prastel, Hay21, iDo.
+
+> [!note]
+> **HT12X vs CAME fix** — Holtek HT12-series frames are now disambiguated from CAME. Previously an HT12X code could be misdecoded as CAME because their timing overlaps; the decoder now checks the HT12X framing first so both classify correctly.
+
+> [!note]
+> **KeeLoq (RcSwitch protocol 23)** stays on the fast path — it's a rolling-code protocol handled by the `mfcodes` keystore (see [KeeLoq auto-decode](#keeloq-auto-decode)), so the brand decoders never claim it.
+>
+> FSK protocols (Honeywell Sec, Marantec) are ported but **won't fire until FSK receive exists** in the firmware.
 
 ## Send
 
@@ -98,12 +172,12 @@ Browse and send `.sub` signal files from storage.
 
 1. Select **Send** from the menu
 2. Browse from `/unigeek/rf/` — navigate into subfolders
-3. **Tap** a file to send it immediately
-4. **Hold** a file (1 second) to open the action menu:
+3. Tap a file to open the action menu:
    - **Send** — transmit the signal
+   - **Info** — open the signal info view (same fields as captured-signal Info; BACK returns here)
    - **Rename** — rename the file
    - **Delete** — delete the file
-5. The frequency stored in the file is used automatically during send
+4. The frequency stored in the file is used automatically during send
 
 ## Jammer
 
@@ -144,6 +218,77 @@ Key: 0xABCDEF
 ```
 
 Files from Flipper Zero and Bruce firmware are compatible and can be placed directly in `/unigeek/rf/`.
+
+## KeeLoq auto-decode
+
+> [!danger]
+> KeeLoq decode and rolling-code replay are intended for testing remotes, gates, and barriers **you own or have explicit written permission to test**. Using them against vehicles, garages, or property that isn't yours is illegal in most jurisdictions and may be prosecuted as unauthorized access, burglary tools possession, or vehicle theft regardless of whether the replay succeeds.
+
+When a captured signal decodes as **RCSwitch protocol 23** (KeeLoq), the firmware automatically tries every manufacturer key stored in `/unigeek/mfcodes`. On a successful match, the **Signal Info** view replaces the opaque `Key:` row with structured fields:
+
+- **Manufacturer** — `NICE_Smilo`, `FAAC_RC,XT`, `Centurion`, etc.
+- **Serial** — `0x12345`
+- **Button** — `0`–`15`
+- **Counter** — `0x4D7`
+- **Fix** — top 32 bits of the reversed payload (always shown)
+- **Hop** — decrypted plaintext
+
+If `/unigeek/mfcodes` is absent or no key matches, the Info view still shows `Manufacturer: Unknown` plus the raw `Fix:` and `Encrypted:` fields — the structured fields don't require the keystore.
+
+### Replay with counter+1 (rolling-code bypass)
+
+> [!danger]
+> `Replay +1` actively bypasses a rolling-code authentication mechanism — qualitatively different from passive capture or fixed-code replay. Only run it against your own hardware. In most jurisdictions, unauthorized use against third-party gates, garages, or vehicles is a separate criminal offense from simple eavesdropping (often felony-tier).
+
+Captured KeeLoq signals (protocol 23) that decoded successfully against the keystore unlock an extra option in the action popup:
+
+- **Replay** — always available. Transmits the captured value byte-exact. Works on fixed-code remotes; fails on rolling-code receivers because the counter is reused.
+- **Replay +1** — only shown when `Manufacturer` is resolved AND its key still lives in `/unigeek/mfcodes`. Advances `cnt` by 1, rebuilds the hop word with the manufacturer-specific layout, re-encrypts with the stored key, and transmits the new 64-bit value. Each tap advances the counter further — visible live as `Manufacturer cnt=NNNN` in the capture list sublabel.
+
+`Replay +1` works against simple-rolling-code receivers (older garage doors / gates / barriers) that accept any counter within their sync window. **It does not** bypass modern automotive immobilizers, devices with seed-based per-fob keys, or any rolling-code system with challenge-response on top.
+
+> [!warning]
+> **`Replay +1` will likely desync your original remote.** After a successful step-replay, the receiver's accepted counter has advanced past where your real fob still is — the fob will stop opening the gate until its counter catches back up. Most receivers have a resync window (press the real fob 2–8 times in a row to walk it forward) but some require a full re-pair procedure with the receiver. Don't run `Replay +1` against a gate you actually need to use unless you're prepared to resync the fob afterwards.
+
+### Keystore format
+
+Drop-in compatible with Bruce's `/mfcodes`. One line per key:
+
+```
+mf_name;hex_key;learning_type
+```
+
+- `mf_name` — free-text label shown in the Info view
+- `hex_key` — 64-bit hexadecimal manufacturer key (with or without `0x`)
+- `learning_type` — `1` for simple learning, `2` for normal learning. `type=0` entries load but stay inactive (matches Bruce — they cover proprietary algorithms like Starline/Tomohawk that the cipher pipeline can't handle without per-fob seed data).
+
+Lines starting with `#` are comments. Up to 64 keys are loaded.
+
+### Mfcodes menu item
+
+The last row of the Sub-GHz menu, **Mfcodes**, shows the current keystore state:
+
+- `Mfcodes   18 keys` — loaded
+- `Mfcodes   not loaded` — file missing or empty
+
+Tap to **reload** the keystore from storage (useful after editing the file via Web File Manager). A toast shows the load result.
+
+### .sub fields persisted
+
+Identified KeeLoq captures save the decoded fields alongside the raw key:
+
+```
+Frequency: 433920000
+Preset: 23
+Protocol: RcSwitch
+TE: 400
+Bit: 64
+Key: 0xABCDEF0123456789
+Manufacturer: NICE_Smilo
+Serial: 0x12345
+Button: 1
+Counter: 1234
+```
 
 ## Supported Modulations
 

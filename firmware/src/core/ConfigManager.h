@@ -46,6 +46,16 @@
 #define APP_CONFIG_TOUCH_SWAP_XY_DEFAULT        "0"
 #define APP_CONFIG_TOUCH_CALIBRATED             "cyd_touch_calibrated"
 #define APP_CONFIG_TOUCH_CALIBRATED_DEFAULT     "0"
+#define APP_CONFIG_WIKI_LANG                    "wiki_lang"
+#define APP_CONFIG_WIKI_LANG_DEFAULT            "en"
+#define APP_CONFIG_LED_MODE                     "led_mode"
+#define APP_CONFIG_LED_MODE_DEFAULT             "off"
+#define APP_CONFIG_MASCOT                       "mascot"
+#define APP_CONFIG_MASCOT_DEFAULT               "hacker"
+#define APP_CONFIG_HIDDEN_MODULES               "hidden_modules"
+#define APP_CONFIG_HIDDEN_MODULES_DEFAULT       "0"
+#define APP_CONFIG_UNIGOTCHI_STYLE              "unigotchi_style"
+#define APP_CONFIG_UNIGOTCHI_STYLE_DEFAULT      "gotchi"
 
 class ConfigManager
 {

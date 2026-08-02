@@ -11,6 +11,11 @@
 class IRScreen : public ListScreen
 {
 public:
+  IRScreen() = default;
+  // Open straight into the Send signal-list for a specific .ir file (used by the
+  // File Manager "Send" action on a long-pressed .ir file).
+  explicit IRScreen(const String& sendFile) : _pendingSendFile(sendFile) {}
+
   const char* title() override { return _titleBuf; }
 
   void onInit() override;
@@ -33,19 +38,14 @@ private:
   int8_t _rxPin = -1;
   char _titleBuf[32] = "IR Remote";
 
-  // Menu
-  ListItem _menuItems[5] = {
-    {"TX Pin"},
-    {"RX Pin"},
+  // Menu — IR TX/RX pins are configured under Settings > Pin Setting.
+  ListItem _menuItems[3] = {
     {"Receive"},
     {"Send"},
     {"TV-B-Gone"},
   };
-  String _txPinSub;
-  String _rxPinSub;
 
   void _showMenu();
-  void _updatePinSublabels();
 
   // Receive state
   IRUtil::Signal _captured[IRUtil::MAX_SIGNALS];
@@ -74,6 +74,8 @@ private:
   String _sendFilePath;
   bool _sendDirty = false;
   bool _holdFired = false;
+  String _pendingSendFile;  // set via ctor: jump into Send list for this file
+  void _openPendingSendFile();
   void _loadAndShowSignals(const String& filePath);
   void _refreshSendList();
   void _onSendItemAction(uint8_t index);

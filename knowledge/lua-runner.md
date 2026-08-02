@@ -92,6 +92,7 @@ local time   = require("uni.time")    -- RTC clock
 local config = require("uni.config")  -- read device settings
 local wifi   = require("uni.wifi")    -- connect / status / ip
 local http   = require("uni.http")    -- blocking GET / POST
+local subghz = require("uni.subghz")  -- Sub-GHz RF (CC1101 / M5 RF433)
 ```
 
 The `uni` table (core functions: `debug`, `delay`, `millis`, `heap`, `beep`) is always available as a global — no require needed.
@@ -183,6 +184,19 @@ uni.beep(880,  30)   -- short blip
 uni.beep(1200, 20)   -- jump sound
 uni.beep(150,  120)  -- collision thud
 ```
+
+---
+
+### `uni.useTouch()` / `uni.useNav()`
+
+Touch boards only, and **cosmetic**: they toggle the on-screen touch-nav *overlay* — the coloured edge bars that mark the up / ok / down / back zones. `uni.useTouch()` hides them; `uni.useNav()` shows them. The runner already hides the overlay for the duration of a script on touch-nav boards, so most scripts never need to call either — they exist for the rare script that wants the zone guides drawn (`uni.useNav()`) or explicitly cleared. Both are **no-ops on button-only boards**, and the overlay is restored automatically when the script exits.
+
+```lua
+uni.useTouch()                 -- hide the zone overlay bars; draw on a clean screen
+```
+
+> [!important] These do not disable navigation
+> `uni.useTouch()` only stops the overlay bars being painted — taps still produce `nav.btn()` directions from their zone (left = `"back"`, right column = up / ok / down) exactly as before. **There is no flag that turns that off.** To own raw taps across the whole screen, hit-test your own targets first and fall through to `nav.btn()` — see [How touch maps to navigation](#how-touch-maps-to-navigation-important) above.
 
 ---
 
@@ -518,6 +532,12 @@ Return the raw screen coordinates of the most recent touch contact, or `-1` when
 
 ---
 
+### `nav.hasTouch()` → bool
+
+Return `true` on boards that have a touch screen, `false` on button / stick / keyboard boards. Use this to branch your UI up front (draw tap targets vs. a button-driven menu) instead of inferring touch from a `-1` `nav.touchX()`. The value is fixed per board — it reflects hardware capability, not whether a finger is currently down.
+
+---
+
 ### `nav.isTouched()` → bool
 
 Return `true` while a finger is currently in contact with the screen. Goes back to `false` on lift. Always `false` on boards without touch.
@@ -536,6 +556,50 @@ while true do
   uni.delay(16)
 end
 ```
+
+---
+
+### How touch maps to navigation (important)
+
+On a **touch-nav board** (no physical buttons — e.g. CoreS3, CYD) the screen is carved into invisible nav zones, and `nav.btn()` is produced from *which zone a tap fell in*:
+
+```
+┌──────┬──────────────────┐
+│      │       UP         │   left quarter  → "back"
+│      ├──────────────────┤   right column, top third    → "up"
+│ BACK │       OK         │   right column, middle third → "ok"
+│      ├──────────────────┤   right column, bottom third → "down"
+│      │       DOWN       │
+└──────┴──────────────────┘
+```
+
+So a single tap is reported **two ways at once**: as raw coordinates (`nav.touchX/Y/isTouched`) *and* as a `nav.btn()` direction. A tap in the left quarter returns `"back"` even though, to your script, the finger landed on whatever you drew there.
+
+> [!warning] Hit-test your own targets before honouring `nav.btn()`
+> If your script does its own coordinate hit-testing (a grid, on-screen buttons, a canvas), resolve the touch **first** and only fall back to the `nav.btn()` direction when the tap missed everything. Otherwise a tap on one of your targets that happens to sit in the `"back"` zone will exit your script. This is exactly how the firmware main menu handles its icon grid.
+>
+> ```lua
+> while true do
+>   local btn = nav.btn()                 -- the release event; touch taps come through here too
+>   if btn ~= "none" then
+>     local hit = cellAt(nav.touchX(), nav.touchY())   -- your own hit-box test
+>     if hit then
+>       select(hit)                       -- a tap on a target wins over the zone it fell in
+>     elseif btn == "back" then
+>       break                             -- a real back: the tap missed every target
+>     elseif btn == "up" or btn == "down" then
+>       moveCursor(btn)                    -- zone directions still drive button-board nav
+>     elseif btn == "ok" then
+>       confirm()
+>     end
+>   end
+>   uni.delay(33)
+> end
+> ```
+>
+> `nav.touchX/Y` return `-1` on button-only boards, so `cellAt()` is `nil` there and `nav.btn()` drives everything exactly as on a stick/keyboard board — the same code path works on every device.
+>
+> There is **no flag that stops taps from generating `nav.btn()`** — the zone mapping is always live, so hit-testing first is the pattern, not a toggle. (`uni.useTouch()` only hides the on-screen zone *overlay* bars so they don't paint over your drawing; it does not change what `nav.btn()` reports.)
 
 ---
 
@@ -758,6 +822,86 @@ lcd.print(16, 14, name)
 
 ---
 
+## `uni.subghz` — Sub-GHz RF
+
+Load with `local subghz = require("uni.subghz")`. A single facade over the two RF backends in the firmware — your script runs the same code regardless of which chip is on the bus:
+
+- **CC1101** — SPI module, tunable ~280–928 MHz, supports frequency scan.
+- **M5 RF433** — Grove two-pin bit-bang, fixed **433.92 MHz**, no tune, no scan.
+
+The backend is **picked lazily** the first time an operation needs the radio: CC1101 is tried first (SPI chip-ID probe via the board's `CC1101_CS` / `CC1101_GDO0` pins), M5 RF433 is the fallback. Call `subghz.info()` to learn which one you got.
+
+> [!warn]
+> Sub-GHz transmit and jamming are **regulated**. Only transmit on frequencies and at duty cycles you are licensed/authorised to use. Receiving and replaying signals you don't own may be illegal in your jurisdiction.
+
+> [!note]
+> The runner tears the radio down automatically when the script exits (RX ISR disarmed, TX stopped, SPI released). You don't have to call `subghz.close()`, but doing so frees the chip mid-script if you're done with it.
+
+### Signal table
+
+`pollReceive`, `parseSub`, `send`, and `formatSub` all marshal the same signal table (identical for both backends). Fields are optional going in — set only what your protocol needs:
+
+| Field | Type | Notes |
+|---|---|---|
+| `frequency` | number | MHz. On `send`, retunes the CC1101 if it differs from the current freq |
+| `preset` | string | modulation preset name (e.g. `"AM650"`) |
+| `protocol` | string | decoder name (e.g. `"Princeton"`, `"KeeLoq"`) |
+| `rawData` | string | space-separated µs timings for RAW signals |
+| `key` | number | decoded code value (fits 32-bit; >2^53 loses precision) |
+| `te`, `bit` | number | timing element (µs) and bit length |
+| `mf_name` | string | manufacturer name (KeeLoq) |
+| `serial`, `btn`, `cnt`, `fix`, `encrypted`, `hop` | number | rolling-code fields (KeeLoq) |
+
+### Functions
+
+| Function | Returns | Notes |
+|---|---|---|
+| `subghz.info()` | table | `{backend="cc1101"\|"rf433"\|nil, canTune=bool, canScan=bool, freq=MHz}`. Opens the radio. |
+| `subghz.setFrequency(mhz)` | bool | CC1101 only. On RF433 returns `false, "unsupported on rf433"` |
+| `subghz.getFrequency()` | number | Current MHz (RF433 always 433.92) |
+| `subghz.setRxFilter(mode)` | bool | `mode` = `"raw"` or `"code"` |
+| `subghz.beginReceive()` | bool | Arm the RX ISR |
+| `subghz.pollReceive()` | signal\|nil | Non-blocking — `nil` when nothing decoded this poll |
+| `subghz.endReceive()` | — | Disarm RX |
+| `subghz.send(signal)` | bool | Detaches RX during TX, re-arms after if you were receiving |
+| `subghz.beginScan()` | bool | CC1101 only — `false, "unsupported on rf433"` otherwise |
+| `subghz.stepScan()` | bool | Advance the scan one step |
+| `subghz.endScan()` | — | Stop scanning |
+| `subghz.getScanFreq()` | number | MHz of the last scan step |
+| `subghz.getScanRssi()` | number | dBm of the last scan step (`-120` when idle) |
+| `subghz.startJam()` | bool | Park the chip in TX / carrier mode |
+| `subghz.jamBurst()` | bool | Emit one burst — must `startJam()` first |
+| `subghz.stopJam()` | — | Stop jamming **and fully tear down** the radio |
+| `subghz.parseSub(content)` | signal\|nil | Parse Flipper `.sub` file text into a signal |
+| `subghz.formatSub(signal)` | string | Serialise a signal back to `.sub` text |
+| `subghz.close()` | — | Release the radio immediately |
+
+```lua
+local subghz = require("uni.subghz")
+local sd     = require("uni.sd")
+
+local info = subghz.info()
+uni.debug("radio: " .. tostring(info.backend))   -- "cc1101" or "rf433"
+
+-- capture the first signal we see, save it as a .sub file, then replay it
+subghz.setRxFilter("code")
+subghz.beginReceive()
+local sig
+while true do
+  if nav.btn() == "back" then break end
+  sig = subghz.pollReceive()
+  if sig then
+    sd.write("/unigeek/subghz/capture.sub", subghz.formatSub(sig))
+    subghz.endReceive()
+    subghz.send(sig)          -- RX is torn down for the TX, then re-armed
+    break
+  end
+  uni.delay(20)
+end
+```
+
+---
+
 ## Writing Scripts with AI
 
 Paste the context block below into any AI chat **before** describing what you want.
@@ -777,6 +921,9 @@ You are writing a Lua 5.1 script for the UniGeek ESP32 firmware Lua Runner.
 - Locals declared INSIDE the loop are re-created each iteration as normal.
 - `break` exits the loop; the runner exits automatically when the script returns — no exit() needed.
 - The Back button: nav.btn() returns "back" — your script must break to exit the loop.
+- On touch-nav boards (CoreS3, CYD — no physical buttons) nav.btn() comes from WHICH zone a
+  tap fell in, so a tap is reported BOTH as raw coords AND as a direction — see the touch-nav
+  hit-test rule below before mixing touch with nav.btn().
 - uni.delay(ms) sleeps the Lua task; nav state stays fresh across delays.
 - Text datum is TL_DATUM (top-left) at script start and restored on exit.
 
@@ -799,7 +946,8 @@ Modules are lazy-loaded — call require() once before the while loop:
   local config = require("uni.config")  -- read device settings
   local wifi   = require("uni.wifi")    -- station-mode connect/status
   local http   = require("uni.http")    -- blocking GET/POST (TLS via setInsecure)
-The uni table (debug, delay, millis, heap, beep) is always a global — no require needed.
+  local subghz = require("uni.subghz")  -- Sub-GHz RF (CC1101 / M5 RF433 auto-detect)
+The uni table (debug, delay, millis, heap, beep, useTouch, useNav) is always a global — no require needed.
 There is NO file-backed loader — require("mymodule") does NOT load .lua files.
 
 ## Anti-flicker rule — CRITICAL
@@ -814,6 +962,30 @@ For changing text: use lcd.textColor(fg, bg) + string.format padding instead of 
 For complex composited frames: build into lcd.sprite(w, h) and sp:push() once per frame.
 lcd.clear() / lcd.fillScreen() are fine for static screens (idle, game over) drawn only on state entry.
 
+## Touch-nav hit-test rule — CRITICAL
+On touch-nav boards (CoreS3, CYD — no physical buttons) the screen is split into fixed zones
+and nav.btn() is decided by WHICH zone a tap fell in: left quarter = "back", right column
+thirds = "up" / "ok" / "down". So every tap is reported BOTH ways at once — as raw coords
+(nav.touchX/Y/isTouched) AND as a nav.btn() direction.
+If your script does its OWN coordinate hit-testing (a grid, on-screen buttons, a canvas) you
+MUST resolve the touch FIRST and fall back to nav.btn()=="back" only when the tap missed every
+target. Otherwise a tap on a target that happens to sit in the "back" zone exits the script.
+nav.touchX/Y are -1 on button-only boards, so the SAME code drives stick/keyboard nav unchanged.
+  while true do
+    local btn = nav.btn()                 -- release event; touch taps arrive here too
+    if btn ~= "none" then
+      local hit = cellAt(nav.touchX(), nav.touchY())   -- your own hit-box test
+      if hit then select(hit)             -- a tap on a target beats the zone it fell in
+      elseif btn == "back" then break      -- a real back: the tap missed everything
+      elseif btn == "up" or btn == "down" then moveCursor(btn)
+      elseif btn == "ok" then confirm() end
+    end
+    uni.delay(33)
+  end
+There is NO flag that stops taps from firing nav.btn() — the zone mapping is always live, so
+hit-testing first is the pattern, not a toggle. uni.useTouch() only hides the zone OVERLAY bars
+(cosmetic) and does NOT change what nav.btn() reports.
+
 ## Complete API
 
 ### System (always available — no require)
@@ -822,6 +994,9 @@ uni.delay(ms)           -- pause ms milliseconds; nav state stays fresh across d
 uni.millis()            -- returns uptime in milliseconds (number)
 uni.heap()              -- returns free internal heap in bytes (number)
 uni.beep(freq, ms)      -- play tone; no-op on boards without speaker
+uni.useTouch()          -- touch boards: hide the nav zone OVERLAY bars (cosmetic only — does
+                        --   NOT stop taps firing nav.btn(); hit-test first, see rule above)
+uni.useNav()            -- touch boards: restore the nav zone overlay (auto-restored on exit)
 
 ### Input  (require "uni.nav" first)
 nav.btn()               -- returns one string per consumed press:
@@ -833,6 +1008,7 @@ nav.btn()               -- returns one string per consumed press:
 nav.touchX()            -- last touch X in pixels, or -1 if no touch / non-touch board
 nav.touchY()            -- last touch Y in pixels, or -1 if no touch / non-touch board
 nav.isTouched()         -- true while a finger is currently down
+nav.hasTouch()          -- true if the board has a touch screen (fixed per board)
 
 ### Display  (require "uni.lcd" first; all coordinates in pixels, origin top-left)
 lcd.w()                 -- screen width (number)
@@ -930,6 +1106,24 @@ wifi.disconnect()                   -- drop connection
 http.get(url)                       -- body | nil, code (≥100=http status, -2=bad url, -3=too big, other negative=transport error)
 http.post(url, [body])              -- same shape; body is any Lua string
 -- Response bodies are capped at 256 KB; over-cap returns nil, -3.
+
+### Sub-GHz RF  (require "uni.subghz")
+-- Auto-detects backend on first use: CC1101 (SPI, tunable, scan) else M5 RF433 (fixed 433.92 MHz, no tune/scan).
+-- Runner tears the radio down automatically on script exit.
+subghz.info()                       -- {backend="cc1101"|"rf433"|nil, canTune, canScan, freq}
+subghz.setFrequency(mhz)            -- bool; CC1101 only (returns false,"unsupported on rf433" on RF433)
+subghz.getFrequency()               -- number MHz (RF433 = 433.92)
+subghz.setRxFilter("raw"|"code")    -- bool
+subghz.beginReceive()               -- bool — arm RX
+subghz.pollReceive()                -- signal table | nil (non-blocking)
+subghz.endReceive()                 -- disarm RX
+subghz.send(signal)                 -- bool — detaches RX during TX, re-arms after
+subghz.beginScan() / stepScan() / endScan()          -- CC1101 only
+subghz.getScanFreq() / getScanRssi()                 -- last scan step MHz / dBm
+subghz.startJam() / jamBurst() / stopJam()           -- stopJam() also tears the radio down
+subghz.parseSub(text) / formatSub(signal)            -- Flipper .sub <-> signal table
+subghz.close()                      -- release radio immediately
+-- signal table fields: frequency, preset, protocol, rawData, key, te, bit, mf_name, serial, btn, cnt, fix, encrypted, hop
 
 ## Rules you must follow
 1. Use the while-loop pattern: while true do … end — runner exits automatically when script returns.

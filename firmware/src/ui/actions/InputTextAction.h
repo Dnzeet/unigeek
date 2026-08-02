@@ -5,6 +5,7 @@
 #pragma once
 
 #include "core/Device.h"
+#include "utils/uart/UartFileManager.h"
 #include "core/ConfigManager.h"
 
 class InputTextAction
@@ -119,8 +120,8 @@ private:
         "jkl5",  "mno6",  "pqrs7", "tuv8",  "wxyz9",
       };
       static constexpr const char* symbolLabels[] = {
-        " ",     ",.'- ", "*/@",   "+-=",   ":;?",
-        "!$#",   "\"&%",  "()[]",  "<>{}",  "^~`",
+        " ",     ",.'- ", "*/\\@", "+-=_",  ":;?",
+        "!$#",   "\"&%|", "()[]",  "<>{}",  "^~`",
       };
 
       const char* const* sets = _symbolMode ? symbolLabels : charLabels;
@@ -184,6 +185,8 @@ private:
 
     while (!_done && !_cancelled) {
       Uni.update();
+      UartFM.poll(); // read remote input so nav works in this dialog
+      if (Mirror.dirty()) Mirror.pump(); // flush only when this overlay redrew
 
       if (_tapCount > 0 && millis() - _lastTapTime >= COMMIT_MS) {
         _commitTap();
@@ -410,6 +413,8 @@ private:
 
     while (!_done && !_cancelled) {
       Uni.update();
+      UartFM.poll(); // read remote input so nav works in this dialog
+      if (Mirror.dirty()) Mirror.pump(); // flush only when this overlay redrew
 
       if (millis() - lastBlink >= BLINK_MS) {
         cursorOn  = !cursorOn;

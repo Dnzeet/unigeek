@@ -33,14 +33,39 @@ IRScreen* IRScreen::_activeInstance = nullptr;
 void IRScreen::onInit() {
   _txPin = (int8_t)PinConfig.getInt(PIN_CONFIG_IR_TX, PIN_CONFIG_IR_TX_DEFAULT);
   _rxPin = (int8_t)PinConfig.getInt(PIN_CONFIG_IR_RX, PIN_CONFIG_IR_RX_DEFAULT);
+  if (_pendingSendFile.length() > 0) {
+    _openPendingSendFile();
+    return;
+  }
   _showMenu();
 }
 
-void IRScreen::_updatePinSublabels() {
-  _txPinSub = (_txPin >= 0) ? String("GPIO ") + String(_txPin) : "Not set";
-  _rxPinSub = (_rxPin >= 0) ? String("GPIO ") + String(_rxPin) : "Not set";
-  _menuItems[0] = {"TX Pin", _txPinSub.c_str()};
-  _menuItems[1] = {"RX Pin", _rxPinSub.c_str()};
+// Launched from the File Manager: skip the menu and open the Send signal-list
+// for a specific .ir file, ready to fire each command.
+void IRScreen::_openPendingSendFile() {
+  String file = _pendingSendFile;
+  _pendingSendFile = "";
+
+  if (_txPin < 0) {
+    ShowStatusAction::show("Set TX pin first");
+    Screen.goBack();
+    return;
+  }
+  #if defined(DEVICE_M5STICK_S3)
+  if (_txPin == IR_TX_PIN) Uni.Power.setExtOutput(true);
+  _irAmpEnable(true);
+  #endif
+  _ir.beginTx(_txPin);
+
+  // Parent folder so BACK from the send-list returns to a browse of that dir.
+  int slash = file.lastIndexOf('/');
+  _browsePath = (slash > 0) ? file.substring(0, slash) : String(kRootPath);
+
+  _loadAndShowSignals(file);
+  if (_state != STATE_SEND_LIST) {   // read/parse failed — bounce back
+    _ir.end();
+    Screen.goBack();
+  }
 }
 
 void IRScreen::_showMenu() {
@@ -51,7 +76,9 @@ void IRScreen::_showMenu() {
   _irAmpEnable(true);
   #endif
   strncpy(_titleBuf, "IR Remote", sizeof(_titleBuf));
-  _updatePinSublabels();
+  // Re-read pins in case they were changed under Settings > Pin Setting.
+  _txPin = (int8_t)PinConfig.getInt(PIN_CONFIG_IR_TX, PIN_CONFIG_IR_TX_DEFAULT);
+  _rxPin = (int8_t)PinConfig.getInt(PIN_CONFIG_IR_RX, PIN_CONFIG_IR_RX_DEFAULT);
   setItems(_menuItems);
 }
 
@@ -120,14 +147,13 @@ void IRScreen::onBack() {
     _ir.end();
     _showMenu();
   } else if (_state == STATE_SEND_BROWSE) {
-    // Navigate up or back to menu
-    if (_browsePath == kRootPath) {
+    // Climb to parent if below kRootPath; at the screen's root, exit to menu.
+    // Keeps the picker confined to /unigeek/ir — no whole-SD-card browse.
+    if (_browsePath == kRootPath || _browsePath.length() == 0) {
       _showMenu();
     } else {
       int slash = _browsePath.lastIndexOf('/');
-      String parent = (slash > 0) ? _browsePath.substring(0, slash) : String(kRootPath);
-      // Don't go above root
-      if (parent.length() < String(kRootPath).length()) parent = kRootPath;
+      String parent = (slash > 0) ? _browsePath.substring(0, slash) : kRootPath;
       _loadBrowseDir(parent);
     }
   } else if (_state == STATE_SEND_LIST) {
@@ -140,29 +166,7 @@ void IRScreen::onBack() {
 void IRScreen::onItemSelected(uint8_t index) {
   if (_state == STATE_MENU) {
     switch (index) {
-      case 0: { // TX Pin
-        int pin = InputNumberAction::popup("TX Pin", -1, 48, _txPin);
-        if (!InputNumberAction::wasCancelled()) {
-          _txPin = (int8_t)pin;
-          PinConfig.set(PIN_CONFIG_IR_TX, String(_txPin));
-          PinConfig.save(Uni.Storage);
-        }
-        _updatePinSublabels();
-        render();
-        break;
-      }
-      case 1: { // RX Pin
-        int pin = InputNumberAction::popup("RX Pin", -1, 48, _rxPin);
-        if (!InputNumberAction::wasCancelled()) {
-          _rxPin = (int8_t)pin;
-          PinConfig.set(PIN_CONFIG_IR_RX, String(_rxPin));
-          PinConfig.save(Uni.Storage);
-        }
-        _updatePinSublabels();
-        render();
-        break;
-      }
-      case 2: { // Receive
+      case 0: { // Receive
         if (_rxPin < 0) {
           ShowStatusAction::show("Set RX pin first");
           render();
@@ -184,7 +188,7 @@ void IRScreen::onItemSelected(uint8_t index) {
         setItems(_recvItems, 0);  // prime pointer once; _showReceiveList uses setCount after this
         break;
       }
-      case 3: { // Send
+      case 1: { // Send
         if (_txPin < 0) {
           ShowStatusAction::show("Set TX pin first");
           render();
@@ -198,7 +202,7 @@ void IRScreen::onItemSelected(uint8_t index) {
         _loadBrowseDir(kRootPath);
         break;
       }
-      case 4: { // TV-B-Gone
+      case 2: { // TV-B-Gone
         if (_txPin < 0) {
           ShowStatusAction::show("Set TX pin first");
           render();
@@ -230,6 +234,7 @@ void IRScreen::onItemSelected(uint8_t index) {
         _ir.startTvBGone(region, _tvbProgressCb, _tvbCancelCb);
 
         _ir.end();
+        ProgressView::finish();
         _activeInstance = nullptr;
 
         if (_tvbCancelled) {
@@ -418,6 +423,9 @@ void IRScreen::_loadBrowseDir(const String& path) {
   if (path == kRootPath) folderName = "IR Files";
   snprintf(_titleBuf, sizeof(_titleBuf), "%s", folderName.c_str());
 
+  // Root at "/" so a ".." row is shown even at kRootPath, letting the picker
+  // climb to the SD card and reach .ir files outside /unigeek/ir.
+  _browser.root = "/";
   uint8_t n = _browser.load(this, path, ".ir");
 
   if (n == 0 && path == kRootPath) {

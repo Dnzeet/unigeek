@@ -5,6 +5,7 @@
 #pragma once
 
 #include "core/Device.h"
+#include "utils/uart/UartFileManager.h"
 
 class ShowStatusAction
 {
@@ -34,6 +35,10 @@ private:
 
   void _run() {
     auto& lcd = Uni.Lcd;
+    // The overlay is transient: snapshot the caller's text datum so we can
+    // restore it on exit. Without this, the MC_DATUM set below leaks out and
+    // misaligns any text the caller (e.g. a Lua script's lcd.print) draws next.
+    auto prevDatum = lcd.getTextDatum();
     lcd.setTextSize(1);
 
     static constexpr int MAX_LINES  = 5;
@@ -95,6 +100,8 @@ private:
     } else if (_duration < 0) {
       for (;;) {
         Uni.update();
+        UartFM.poll(); // read remote input so nav works in this dialog
+        if (Mirror.dirty()) Mirror.pump(); // flush only when this overlay redrew
 #ifdef DEVICE_HAS_KEYBOARD
         if (Uni.Keyboard && Uni.Keyboard->available()) {
           Uni.Keyboard->getKey();
@@ -110,5 +117,8 @@ private:
       _wipe(x, y, w, h);
     }
     // _duration == 0: show and return immediately, no wipe
+
+    // Restore the caller's datum — the overlay must not leak its MC_DATUM.
+    lcd.setTextDatum(prevDatum);
   }
 };

@@ -157,7 +157,14 @@ void PN532UartScreen::onBack() {
       _goMain();
       break;
     case STATE_DICT_SELECT:
-      _goMifare();
+      if (_dictPickDir == _dictPath || _dictPickDir.length() == 0) {
+        _dictPickDir = "";
+        _goMifare();
+      } else {
+        int slash = _dictPickDir.lastIndexOf('/');
+        _dictPickDir = (slash > 0) ? _dictPickDir.substring(0, slash) : _dictPath;
+        _doDictionaryPicker();
+      }
       break;
     case STATE_LOAD_DUMP:
       _goMain();
@@ -207,6 +214,7 @@ bool PN532UartScreen::_initModule() {
   _isKiller = _pn->isPN532Killer(killer);
   _killerCode = killer;
 
+  ProgressView::finish();
   _ready = true;
   int n = Achievement.inc("pn532_first_use");
   if (n == 1) Achievement.unlock("pn532_first_use");
@@ -500,6 +508,7 @@ void PN532UartScreen::_doAuthenticate() {
     }
   }
 
+  ProgressView::finish();
   _goMifare();
 }
 
@@ -567,6 +576,7 @@ void PN532UartScreen::_doDumpMemory() {
     if (blk < 64) memcpy(&_dumpImg[blk * 16], data, 16);
   }
 
+  ProgressView::finish();
   char summary[32];
   snprintf(summary, sizeof(summary), "%d/%d blocks", readCount, (int)totalBlocks);
   _pushRow("Read", summary);
@@ -600,8 +610,10 @@ void PN532UartScreen::_doDictionaryPicker() {
   if (!_hasCard) { ShowStatusAction::show("Authenticate first"); _goMifare(); return; }
 
   _state = STATE_DICT_SELECT;
-  uint8_t n = _browser.load(this, _dictPath, ".txt");
-  if (n == 0) {
+  if (_dictPickDir.length() == 0) _dictPickDir = _dictPath;
+  _browser.root = _dictPath;
+  uint8_t n = _browser.load(this, _dictPickDir, ".txt");
+  if (n == 0 && _dictPickDir == _dictPath) {
     ShowStatusAction::show("No dictionary files");
     _goMifare();
     return;
@@ -626,7 +638,13 @@ static bool _parseHexKeyLine(const String& line, uint8_t out[6]) {
 
 void PN532UartScreen::_doDictionaryAttackWithFile(uint8_t fileIndex) {
   if (fileIndex >= _browser.count()) return;
-  String filePath = _browser.entry(fileIndex).path;
+  const auto& e = _browser.entry(fileIndex);
+  if (e.isDir) {
+    _dictPickDir = e.path;
+    _doDictionaryPicker();   // re-renders the list at the new dir
+    return;
+  }
+  String filePath = e.path;
   String content = Uni.Storage->readFile(filePath.c_str());
   if (content.length() == 0) { ShowStatusAction::show("Empty file"); return; }
 
@@ -677,6 +695,7 @@ void PN532UartScreen::_doDictionaryAttackWithFile(uint8_t fileIndex) {
     }
   }
 
+  ProgressView::finish();
   if (recovered > 0) {
     int n = Achievement.inc("nfc_dict_attack");
     if (n == 1) Achievement.unlock("nfc_dict_attack");
@@ -717,6 +736,7 @@ void PN532UartScreen::_doUltralightDump() {
       _pushRow(label, _hexBlock(&data[i * 4], 4));
     }
   }
+  ProgressView::finish();
   _scrollView.setRows(_rows, _rowCount);
   render();
 }
@@ -913,6 +933,7 @@ void PN532UartScreen::_doEmulate() {
     return;
   }
 
+  ProgressView::finish();
   int n = Achievement.inc("pn532_emulate");
   if (n == 1) Achievement.unlock("pn532_emulate");
 
@@ -952,28 +973,19 @@ void PN532UartScreen::_doSaveDump() {
 
 void PN532UartScreen::_doLoadDump() {
   _state = STATE_LOAD_DUMP;
-  _dumpFileCount = 0;
   if (!Uni.Storage || !Uni.Storage->isAvailable()) {
     ShowStatusAction::show("Storage unavailable"); _goMain(); return;
   }
-  IStorage::DirEntry entries[MAX_DUMP_FILES];
-  uint8_t count = Uni.Storage->listDir(_dumpPath, entries, MAX_DUMP_FILES);
-  for (uint8_t i = 0; i < count && _dumpFileCount < MAX_DUMP_FILES; i++) {
-    if (!entries[i].isDir && entries[i].name.endsWith(".bin")) {
-      _dumpFileNames[_dumpFileCount] = entries[i].name;
-      _dumpItems[_dumpFileCount] = { _dumpFileNames[_dumpFileCount].c_str() };
-      _dumpFileCount++;
-    }
-  }
-  if (_dumpFileCount == 0) {
+  uint8_t n = _browser.load(this, _dumpPath, ".bin");
+  if (n == 0) {
     ShowStatusAction::show("No dump files"); _goMain(); return;
   }
-  setItems(_dumpItems, _dumpFileCount);
+  setItems(_browser.items(), n);
 }
 
 void PN532UartScreen::_doLoadAndEmulate(uint8_t fileIndex) {
-  if (fileIndex >= _dumpFileCount) return;
-  String path = String(_dumpPath) + "/" + _dumpFileNames[fileIndex];
+  if (fileIndex >= _browser.count()) return;
+  String path = _browser.entry(fileIndex).path;
 
   uint8_t img[1024];
   memset(img, 0x00, sizeof(img));
@@ -991,11 +1003,12 @@ void PN532UartScreen::_doLoadAndEmulate(uint8_t fileIndex) {
   bool modeOk = _pn->killerSetWorkMode(PN532::KILLER_EMULATOR, PN532::KILLER_MFC1K, 0);
   if (!modeOk) { ShowStatusAction::show("Mode switch failed"); _goMain(); return; }
 
+  ProgressView::finish();
   int n = Achievement.inc("pn532_emulate");
   if (n == 1) Achievement.unlock("pn532_emulate");
 
   char msg[48];
-  snprintf(msg, sizeof(msg), "Emulating: %s", _dumpFileNames[fileIndex].c_str());
+  snprintf(msg, sizeof(msg), "Emulating: %s", _browser.entry(fileIndex).name.c_str());
   ShowStatusAction::show(msg);
   _goMain();
 }

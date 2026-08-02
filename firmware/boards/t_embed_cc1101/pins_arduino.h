@@ -49,6 +49,10 @@ static const uint8_t SCL = GROVE_SCL;
 #define ENCODER_BTN  0   // encoder push (active LOW)
 #define ENCODER_BK   6   // dedicated back button (active LOW)
 
+// ─── RGB LED ring (WS2812B) ───────────────────────────────
+#define RGB_LED     14   // addressable data pin
+#define LED_COUNT    8   // pixels in the ring
+
 // ─── Power ────────────────────────────────────────────────
 #define PIN_POWER_ON  15  // keep HIGH to stay powered
 
@@ -85,4 +89,5 @@ static const uint8_t SCL = GROVE_SCL;
 #define DEVICE_HAS_VOLUME_CONTROL // I2S amp supports setVolume()
 #define DEVICE_HAS_USB_HID        // ESP32-S3 native USB OTG
 #define DEVICE_HAS_WEBAUTHN       // FIDO2 / WebAuthn USB security key (CTAP2 + U2F)
+#define DEVICE_HAS_LED_RING       // WS2812B ring → LED Effect setting
 #define APP_MENU_POWER_OFF        // BQ25896 can power off the device

@@ -21,7 +21,7 @@ Unlocking an achievement shows a toast notification at the bottom of the screen 
 
 ## Ranks
 
-Total possible EXP across all achievements: **99 100** (238 entries).
+Total possible EXP across all achievements: **100 300** (246 entries).
 
 | Rank | EXP Required | % of Total |
 |------|-------------|-----------|
@@ -72,7 +72,7 @@ If no title has been set, it shows `[RANK] No Title` by default.
 
 | # | Domain | Achievements |
 |---|--------|-------------:|
-| 0 | WiFi Network | 20 |
+| 0 | WiFi Network | 28 |
 | 1 | WiFi Attacks | 54 |
 | 2 | Bluetooth | 16 |
 | 3 | HID | 12 |
@@ -85,7 +85,7 @@ If no title has been set, it shows `[RANK] No Title` by default.
 | 10 | Games | 31 |
 | 11 | Settings | 4 |
 | 12 | Chameleon | 34 |
-| | **Total** | **238** |
+| | **Total** | **246** |
 
 ---
 
@@ -113,6 +113,14 @@ If no title has been set, it shows `[RANK] No Title` by default.
 | Payload Collector | WiFi Network | Silver | 300 |
 | Time Lord | WiFi Network | Bronze | 100 |
 | WiGLE Curious | WiFi Network | Bronze | 100 |
+| Encyclopedist | WiFi Network | Bronze | 100 |
+| First Read | WiFi Network | Bronze | 100 |
+| Bookworm | WiFi Network | Silver | 300 |
+| Lucky Dip | WiFi Network | Bronze | 100 |
+| History Buff | WiFi Network | Bronze | 100 |
+| Bookmarked | WiFi Network | Bronze | 100 |
+| Pass It On | WiFi Network | Bronze | 100 |
+| Polyglot | WiFi Network | Silver | 300 |
 | Fake Hotspot | WiFi Attacks | Bronze | 100 |
 | First Guest | WiFi Attacks | Silver | 300 |
 | Disconnector | WiFi Attacks | Bronze | 100 |
@@ -179,6 +187,7 @@ If no title has been set, it shows `[RANK] No Title` by default.
 | Macro Maestro | HID | Gold | 600 |
 | Automation God | HID | Platinum | 1000 |
 | Wiggle Wiggle | HID | Bronze | 100 |
+| Remote Control | HID | Bronze | 100 |
 | Key in Hand | HID | Bronze | 100 |
 | Passkey Pioneer | HID | Silver | 300 |
 | Vault Opener | HID | Bronze | 100 |
@@ -303,4 +312,4 @@ If no title has been set, it shows `[RANK] No Title` by default.
 | Blank Re-writer | Chameleon | Gold | 600 |
 | Lockpick LF | Chameleon | Gold | 600 |
 
-> WiGLE uploads from both GPS > Wardriving and WiFi > Network > WiGLE count toward the same milestones. Locked Platinum entries display `???` in the in-app list until earned.
+> WiGLE uploads from both GPS > Wardriving and WiFi > Network > Internet > Wigle count toward the same milestones. Locked Platinum entries display `???` in the in-app list until earned.

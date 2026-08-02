@@ -5,8 +5,8 @@ Manage device files from a browser over WiFi. The web interface must be download
 ## Setup
 
 1. Connect to a WiFi network via **WiFi > Network**
-2. Download the web interface via **WiFi > Network > Download > Web File Manager** (only needed once)
-3. Go to **WiFi > Network > Web File Manager**
+2. Download the web interface via **WiFi > Network > Internet > Download > Web File Manager** (only needed once)
+3. Go to **WiFi > Network > Services > Web File Manager**
 4. **Password** — Set a login password (saved in device settings)
 5. **Start** — Launches the server
 6. Open the displayed IP address in a browser on the same network (port 8080, e.g. `http://192.168.1.x:8080`)

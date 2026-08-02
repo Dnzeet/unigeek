@@ -84,18 +84,29 @@ void WifiBeaconAttackScreen::onItemSelected(uint8_t index)
   }
 
   if (_state == STATE_FILE_PICK) {
-    // Index 0 is the virtual "Built In" entry. Index 1..N map to BrowseFileView.
-    if (index == 0) {
+    // At the default DICT_DIR, index 0 is the virtual "Built In" entry; the
+    // rest map to BrowseFileView. In subdirectories there's no "Built In" row.
+    uint8_t baseOffset = (_pickerDir == DICT_DIR) ? 1 : 0;
+    if (baseOffset && index == 0) {
       _spamTarget = SPAM_BUILTIN;
-    } else {
-      uint8_t bIdx = index - 1;
-      if (bIdx < _browser.count()) {
-        const auto& e = _browser.entry(bIdx);
-        if (!e.isDir && _loadDictFile(e.path)) {
-          _fileLabel  = e.name;
-          _spamTarget = SPAM_FILE;
-        }
-      }
+      _state = STATE_MENU;
+      setItems(_menuItems, 3);
+      _updateMenuValues();
+      return;
+    }
+
+    uint8_t bIdx = index - baseOffset;
+    if (bIdx >= _browser.count()) return;
+    const auto& e = _browser.entry(bIdx);
+
+    if (e.isDir) {
+      _pickerDir = e.path;   // ".." or a real subdir — both work
+      _showFilePicker();
+      return;
+    }
+    if (_loadDictFile(e.path)) {
+      _fileLabel  = e.name;
+      _spamTarget = SPAM_FILE;
     }
     _state = STATE_MENU;
     setItems(_menuItems, 3);
@@ -129,10 +140,16 @@ void WifiBeaconAttackScreen::onUpdate()
         render();
       }
     } else {
+      // Clients dedupe APs by SSID, so flooding the bare target name shows as a
+      // single entry (and merges with the real AP). Append a rotating suffix so
+      // the victim's list fills with visible copies of the selected network.
       for (int i = 0; i < 5; i++) {
+        char ssid[33];
+        snprintf(ssid, sizeof(ssid), "%.28s %02d",
+                 _apList[_floodTarget].ssid, _ssidIdx % 32);
+        _ssidIdx++;
         esp_err_t r = _attacker->beaconFlood(
-          _apList[_floodTarget].bssid, _apList[_floodTarget].ssid,
-          _apList[_floodTarget].channel);
+          _apList[_floodTarget].bssid, ssid, _apList[_floodTarget].channel);
         if (r == ESP_OK) _sentThisSec++;
         vTaskDelay(pdMS_TO_TICKS(1));
       }
@@ -167,7 +184,21 @@ void WifiBeaconAttackScreen::onRender()
 void WifiBeaconAttackScreen::onBack()
 {
   if (_state == STATE_ATTACKING) { _stop(); return; }
-  if (_state == STATE_SELECT_AP || _state == STATE_FILE_PICK) {
+  if (_state == STATE_FILE_PICK) {
+    // Clamp at DICT_DIR — never climb above /unigeek/wifi/beacon_dicts.
+    if (_pickerDir == DICT_DIR || _pickerDir.length() == 0) {
+      _pickerDir = "";
+      _state = STATE_MENU;
+      setItems(_menuItems, 3);
+      _updateMenuValues();
+      return;
+    }
+    int slash = _pickerDir.lastIndexOf('/');
+    _pickerDir = (slash > 0) ? _pickerDir.substring(0, slash) : DICT_DIR;
+    _showFilePicker();
+    return;
+  }
+  if (_state == STATE_SELECT_AP) {
     _state = STATE_MENU;
     setItems(_menuItems, 3);
     _updateMenuValues();
@@ -394,17 +425,25 @@ void WifiBeaconAttackScreen::_drawAttacking()
 
 void WifiBeaconAttackScreen::_showFilePicker()
 {
+  if (_pickerDir.length() == 0) _pickerDir = DICT_DIR;
+
   uint8_t n = 0;
   if (Uni.Storage && Uni.Storage->isAvailable()) {
-    Uni.Storage->makeDir(DICT_DIR);                        // ensure exists
-    n = _browser.load(this, DICT_DIR, ".txt");
+    if (_pickerDir == DICT_DIR) Uni.Storage->makeDir(DICT_DIR);
+    _browser.root = DICT_DIR;
+    n = _browser.load(this, _pickerDir, ".txt");
   }
 
-  _pickerItems[0] = { "Built In", "(hardcoded)" };
-  for (uint8_t i = 0; i < n; i++) _pickerItems[i + 1] = _browser.items()[i];
+  // "Built In" is only meaningful at the default location.
+  uint8_t baseOffset = 0;
+  if (_pickerDir == DICT_DIR) {
+    _pickerItems[0] = { "Built In", "(hardcoded)" };
+    baseOffset      = 1;
+  }
+  for (uint8_t i = 0; i < n; i++) _pickerItems[i + baseOffset] = _browser.items()[i];
 
   _state = STATE_FILE_PICK;
-  setItems(_pickerItems, (uint8_t)(n + 1));
+  setItems(_pickerItems, (uint8_t)(n + baseOffset));
 }
 
 bool WifiBeaconAttackScreen::_loadDictFile(const String& path)

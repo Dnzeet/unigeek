@@ -1,6 +1,5 @@
 //
 // NRF24L01+ module screen — spectrum, jammer, MouseJack
-// Reference: Bruce firmware NRF24 module
 //
 
 #pragma once
@@ -27,10 +26,7 @@ private:
   enum State {
     STATE_MENU,
     STATE_SPECTRUM,
-    STATE_JAMMER_MENU,
     STATE_JAMMER_RUNNING,
-    STATE_CH_JAMMER,
-    STATE_HOPPER_RUN,
     STATE_MJ_SCAN,
   } _state = STATE_MENU;
 
@@ -54,21 +50,12 @@ private:
 
   // ─── Jammer ──────────────────────────────────────────────────────
   static constexpr int kJamModes = 10;
-  ListItem _jamMenuItems[12];  // 10 presets + Single CH + CH Hopper
-  int      _jamMode   = 0;     // active preset mode (0–9)
-  int      _jamHopIdx = 0;     // channel hop index within mode list
-  uint32_t _lastHopMs  = 0;
-  uint32_t _lastRender = 0;
-
-  // Single-channel jammer
-  int  _chJamCh     = 50;
-  bool _chJamPaused = false;
-
-  // Channel hopper
-  int _hopStart = 0;
-  int _hopStop  = 80;
-  int _hopStep  = 2;
-  int _hopCh    = 0;
+  int      _jamModeIndex = 0;   // active mode (0–9)
+  int      _jamHopIndex  = 0;   // hop position within the mode's channel list
+  uint8_t  _jamHopMode   = 0;   // 0 = sequential, 1 = random (FHSS)
+  bool     _jamReshuffle = true;
+  uint8_t  _jamShuffled[124] = {};  // shuffled index table for the current mode
+  uint32_t _lastRender   = 0;
 
   // ─── MouseJack ───────────────────────────────────────────────────
   static constexpr int kMjMax = 12;
@@ -82,13 +69,13 @@ private:
   MjTarget _mjTargets[kMjMax] = {};
   uint8_t  _mjCount    = 0;
   int      _mjSelected = 0;
-  int      _mjScanCh   = 0;
+  int      _mjScanCh   = 2;
   uint16_t _mjMsSeq    = 0;
+  uint32_t _mjHopMs    = 0;
   char     _mjAddrBufs[kMjMax][18];
 
   // ─── Helpers ─────────────────────────────────────────────────────
   void _showMenu();
-  void _showJammerMenu();
   bool _radioBegin();
   void _radioEnd();
 
@@ -98,21 +85,32 @@ private:
   uint16_t _specBarColor(uint8_t level);
 
   // Jammer
-  void _initCW(int ch);
+  void _startJammer();
   void _jamStep();
   void _renderJammerStatus();
-  void _renderChJammer();
-  void _renderHopper();
-  static const uint8_t* _jamChannels(int mode, int& count);
 
-  // MouseJack
+  // MouseJack — scanning
   void _setupMjScan();
   void _stepMjScan();
-  void _fingerprintMj(const uint8_t* buf, uint8_t len, uint8_t ch);
+  static uint16_t _crc16Update(uint16_t crc, uint8_t byte, uint8_t bits);
+  void _esbDecode(const uint8_t* raw, uint8_t size, uint8_t ch);
+  void _fingerprintPayload(const uint8_t* payload, uint8_t size, const uint8_t* addr, uint8_t ch);
   void _addMjTarget(const uint8_t* addr, uint8_t addrLen, uint8_t ch, uint8_t type);
-  void _injectMjText(int targetIdx, const String& text);
   void _renderMjScan();
+  bool _mjAbort();
 
+  // MouseJack — injection
+  void _setupTxForTarget(const MjTarget& t);
+  void _transmitReliable(const uint8_t* frame, uint8_t len);
+  static void _msChecksum(uint8_t* payload, uint8_t size);
+  static void _msCrypt(uint8_t* payload, uint8_t size, const uint8_t* addr);
   void _msTransmit(const MjTarget& t, uint8_t mod, uint8_t key);
-  void _logTransmit(const MjTarget& t, uint8_t mod, uint8_t key);
+  void _logTransmit(const MjTarget& t, uint8_t mod, const uint8_t* keys, uint8_t keysLen);
+  void _logitechWake(const MjTarget& t);
+  void _sendKeystroke(const MjTarget& t, uint8_t mod, uint8_t key);
+  void _typeString(const MjTarget& t, const char* text);
+  bool _parseDuckyLine(const String& line, const MjTarget& t);
+  void _injectMjText(int targetIdx, const String& text);
+  void _injectMjDucky(int targetIdx, const String& path);
+  void _pickDuckyScript(int targetIdx);
 };

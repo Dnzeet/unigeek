@@ -52,7 +52,7 @@ Log files are saved to `/unigeek/gps/wardriver/` in Wigle-compatible CSV format,
 
 Wigle features are available in two places:
 - **Modules > GPS** — Internet connection, token, stats, and upload alongside wardriving
-- **WiFi > Network > Wigle** — Same token, stats, and upload when already connected to WiFi
+- **WiFi > Network > Internet > Wigle** — Same token, stats, and upload when already connected to WiFi
 
 ### Internet
 
@@ -60,7 +60,7 @@ Connect to a WiFi network for Wigle API features. Scans nearby networks, lets yo
 
 ### Wigle Token
 
-Set your Wigle API token (Base64-encoded, from [wigle.net](https://wigle.net) account settings). The token is shared between GPS and Network > Wigle.
+Set your Wigle API token (Base64-encoded, from [wigle.net](https://wigle.net) account settings). The token is shared between GPS and Network > Internet > Wigle.
 
 ### Wardrive Stat
 
@@ -72,7 +72,7 @@ Lists wardrive CSV files sorted by name (newest first). Uploaded files are marke
 
 ### Map View
 
-Available from both **Modules > GPS** and **WiFi > Network > Wigle** (Wigle path requires WiFi). Picks a wardrive CSV with the same file browser as Upload, then renders the path on a Web-Mercator z11 ESRI World Imagery map.
+Available from both **Modules > GPS** and **WiFi > Network > Internet > Wigle** (Wigle path requires WiFi). Picks a wardrive CSV with the same file browser as Upload, then renders the path on a Web-Mercator z11 ESRI World Imagery map.
 
 - Tiles streamed from `https://server.arcgisonline.com/.../World_Imagery/MapServer/tile/{z}/{y}/{x}` and cached on SD at `/unigeek/maps/{z}/{x}/{y}.jpg`. After the first viewing, replays are offline.
 - Path drawn as a thick yellow polyline; start marker is a green dot, end marker is a red dot. Drawing is clipped to the screen body so the title and status bars stay clean.

@@ -11,13 +11,15 @@ public:
   void onBack() override;
 
 private:
+  void _toggleRemoteDevice();
+
   ListItem _items[7] = {
     {"BLE Analyzer"},
-    {"BLE Beacon Spam"},
-    {"BLE Device Spam"},
+    {"BLE Spam"},
     {"BLE Detector"},
     {"WhisperPair"},
     {"Chameleon Ultra"},
     {"Claude Buddy"},
+    {"Remote Device"},
   };
 };
