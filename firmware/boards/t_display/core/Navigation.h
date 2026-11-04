@@ -1,5 +1,5 @@
 //
-// T-Display 16MB — 2 buttons: BTN_UP (GPIO 0) and BTN_B (GPIO 35).
+// T-Display 16MB — 2 buttons: BTN_UP (GPIO 35) and BTN_B (GPIO 0).
 // BTN_UP = UP, BTN_B single-click = DOWN, double-click = PRESS, hold >600ms = BACK.
 //
 
