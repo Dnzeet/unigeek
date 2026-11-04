@@ -1,8 +1,6 @@
-//
-// T-Display 16MB — 2 buttons: BTN_UP (GPIO 35) and BTN_B (GPIO 0).
-// BTN_UP = UP, BTN_B single-click = DOWN, double-click = PRESS, hold >600ms = BACK.
-//
-
+// LilyGO T-Display 16MB — two-button navigation.
+// BTN_UP (GPIO 35): UP
+// BTN_B  (GPIO 0): single click = DOWN, double click = PRESS, hold = BACK.
 #pragma once
 
 #include "core/INavigation.h"
@@ -12,97 +10,123 @@ class NavigationImpl : public INavigation
 public:
   void begin() override {
     pinMode(BTN_UP, INPUT_PULLUP);
-    pinMode(BTN_B,  INPUT_PULLUP);
+    pinMode(BTN_B, INPUT_PULLUP);
+    _rawBottom = digitalRead(BTN_B) == LOW;
+    _stableBottom = _rawBottom;
+    _rawChangedAt = millis();
   }
 
-  void update() override
-  {
-    bool btnUp   = (digitalRead(BTN_UP) == LOW);
-    bool btnDown = (digitalRead(BTN_B)  == LOW);
-    uint32_t now = millis();
+  void update() override {
+    const uint32_t now = millis();
 
-    if (btnUp) {
-      _waitDblClick = false;
+    // UP is a direct held direction. Cancel any pending bottom-button click
+    // so a simultaneous/overlapping UP press cannot later trigger DOWN/SELECT.
+    if (digitalRead(BTN_UP) == LOW) {
+      cancelBottomClick();
       updateState(DIR_UP);
       return;
     }
 
-    // Synthetic single-click: emit DIR_DOWN for one cycle then DIR_NONE
-    if (_syntheticDown) {
-      _syntheticDown = false;
-      updateState(DIR_NONE);
+    // Debounce the bottom button before interpreting edges.
+    const bool rawBottom = digitalRead(BTN_B) == LOW;
+    if (rawBottom != _rawBottom) {
+      _rawBottom = rawBottom;
+      _rawChangedAt = now;
+    }
+
+    if ((now - _rawChangedAt) >= DEBOUNCE_MS && _stableBottom != _rawBottom) {
+      _stableBottom = _rawBottom;
+      if (_stableBottom) onBottomPressed(now);
+      else onBottomReleased(now);
+    }
+
+    if (_stableBottom) {
+      if (!_longPressFired && (now - _pressStartedAt) >= LONG_PRESS_MS) {
+        _longPressFired = true;
+        _pendingSingle = false;
+        _doublePress = false;
+        updateState(DIR_BACK);
+      } else if (_longPressFired) {
+        updateState(DIR_BACK);
+      } else if (_doublePress) {
+        updateState(DIR_PRESS);
+      } else {
+        updateState(DIR_NONE);
+      }
       return;
     }
 
-    if (btnDown && !_btnBWasDown) {
-      _btnBWasDown  = true;
+    // Resolve a single click only after the double-click window has elapsed.
+    if (_pendingSingle && (now - _releasedAt) >= DBL_CLICK_MS) {
+      _pendingSingle = false;
+      _emitTap = true;
+    }
 
-      if (_waitDblClick && (now - _lastDownTime) <= DBL_CLICK_MS) {
-        _waitDblClick = false;
-        _heldDir = DIR_PRESS;
-        updateState(DIR_PRESS);
-      } else {
-        _waitDblClick = true;
-        _lastDownTime = now;
-        _heldDir      = DIR_NONE;
-        updateState(DIR_NONE);
-      }
-    } else if (btnDown) {
-      uint32_t held = now - _lastDownTime;
-
-      if (!_btnBLong && held > LONG_PRESS_MS) {
-        _btnBLong     = true;
-        _waitDblClick = false;
-        _heldDir      = DIR_NONE;
-        updateState(DIR_BACK);
-        return;
-      }
-      if (_btnBLong) { updateState(DIR_NONE); return; }
-
-      if (_waitDblClick) {
-        if (held > DBL_CLICK_MS) {
-          _waitDblClick = false;
-          _heldDir = DIR_DOWN;
-          updateState(DIR_DOWN);
-        } else {
-          updateState(DIR_NONE);
-        }
-      } else {
-        updateState(_heldDir);
-      }
+    if (_emitPress) {
+      _emitPress = false;
+      updateState(DIR_PRESS);
+    } else if (_emitTap) {
+      _emitTap = false;
+      updateState(DIR_DOWN);
     } else {
-      _btnBWasDown = false;
-      _heldDir     = DIR_NONE;
-
-      if (_btnBLong) {
-        _btnBLong = false;
-        updateState(DIR_NONE);
-        return;
-      }
-
-      if (_waitDblClick) {
-        if ((now - _lastDownTime) > DBL_CLICK_MS) {
-          _waitDblClick  = false;
-          _syntheticDown = true;
-          updateState(DIR_DOWN);
-          return;
-        } else {
-          updateState(DIR_NONE);
-        }
-      } else {
-        updateState(DIR_NONE);
-      }
+      updateState(DIR_NONE);
     }
   }
 
 private:
-  static constexpr uint32_t DBL_CLICK_MS  = 250;
+  static constexpr uint32_t DEBOUNCE_MS = 25;
+  static constexpr uint32_t DBL_CLICK_MS = 280;
   static constexpr uint32_t LONG_PRESS_MS = 600;
 
-  uint32_t  _lastDownTime   = 0;
-  bool      _btnBWasDown    = false;
-  bool      _waitDblClick   = false;
-  bool      _syntheticDown  = false;
-  bool      _btnBLong       = false;
-  Direction _heldDir        = DIR_NONE;
+  void onBottomPressed(uint32_t now) {
+    _pressStartedAt = now;
+    _longPressFired = false;
+    _doublePress = false;
+
+    if (_pendingSingle && (now - _releasedAt) <= DBL_CLICK_MS) {
+      _pendingSingle = false;
+      _doublePress = true;
+    } else {
+      // A prior click whose window expired is a single click. Normally it is
+      // emitted by update(); this guard handles a delayed polling edge safely.
+      if (_pendingSingle) _emitTap = true;
+      _pendingSingle = false;
+    }
+  }
+
+  void onBottomReleased(uint32_t now) {
+    if (_longPressFired) {
+      _longPressFired = false;
+      _doublePress = false;
+      return;
+    }
+
+    if (_doublePress) {
+      _doublePress = false;
+      _emitPress = true;
+      return;
+    }
+
+    _pendingSingle = true;
+    _releasedAt = now;
+  }
+
+  void cancelBottomClick() {
+    _pendingSingle = false;
+    _emitTap = false;
+    _emitPress = false;
+    _doublePress = false;
+    _longPressFired = false;
+  }
+
+  uint32_t _rawChangedAt = 0;
+  uint32_t _pressStartedAt = 0;
+  uint32_t _releasedAt = 0;
+  bool _rawBottom = false;
+  bool _stableBottom = false;
+  bool _pendingSingle = false;
+  bool _doublePress = false;
+  bool _longPressFired = false;
+  bool _emitTap = false;
+  bool _emitPress = false;
 };
