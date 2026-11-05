@@ -26,6 +26,13 @@ public:
   }
 
   void powerOff() override {
+    // Matikan backlight & ADC, bangunkan lewat tombol GPIO 35 (aktif LOW) — sama seperti Bruce
+    ledcDetachPin(LCD_BL);
+    pinMode(LCD_BL, OUTPUT);
+    digitalWrite(LCD_BL, LOW);
+    digitalWrite(ADC_EN, LOW);
+
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)BTN_B, 0);
     esp_deep_sleep_start();
   }
 };
